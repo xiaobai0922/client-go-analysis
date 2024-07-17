@@ -321,11 +321,44 @@ func (r *Reflector) resyncChan() (<-chan time.Time, func() bool) {
 // ListAndWatch first lists all items and get the resource version at the moment of call,
 // and then use the resource version to watch.
 // It returns error if ListAndWatch didn't even try to initialize watch.
+/*
+	ListAndWatch 方法通过先列出所有项目来获取请求时的资源版本，然后使用该资源版本来进行 watch 操作
+		1. 首先，该方法会执行一个 List 操作，获取当前所有资源的快照，这一步操作能够获取最新的资源状态及其对应的资源版本(Resource Version)
+		2. List 操作返回的结果中包含了当时一致性的资源版本，这个版本号非常重要，是后续 Watch 操作的起点
+		3. 使用从 List 操作中获得的资源版本，ListAndWatch 方法会立即开始 Watch 操作,Watch 操作用于实时监控从该版本开始的资源变化事件
+		4. List 操作确保你的本地数据快照是最新的，而 Watch 操作则会跟踪任何从该版本之后的变化,通过这种方式，可以确保本地存储的数据与 Kubernetes 服务器上的数据保持一致
+*/
 func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	klog.V(3).Infof("Listing and watching %v from %s", r.typeDescription, r.name)
 	var err error
 	var w watch.Interface
 	fallbackToList := !r.UseWatchList
+	/*
+		watchList 是一种更为高级的工作流和操作
+		watchList 方法通过 MostRecent(最新) 和 Exact(精确) 两种资源版本匹配方式来建立与 kubernetes 的一致性工作流
+		case1：
+			获取最新资源版本的一致性数据流
+			ResourceVersion = ""：表示没有指定具体的资源版本
+			ResourceVersionMatch = ResourceVersionMatchNotOlderThan：表示允许返回不早于最新资源版本的数据
+			操作流程:
+				建立数据流：与服务器建立一致性的数据流
+				初始状态：以 Added 事件的形式，服务器发送所有资源的初始状态，这些状态数据与最新的资源版本一致
+				同步点：紧接着，服务器发送一个包含最新资源版本的 Bookmark 事件
+				同步完成：接收到 Bookmark 事件后，控制器(或者反射器 reflector)认为自身已与服务器状态同步
+				数据存储：用收集到的资源更新其内部存储
+				后续事件处理：继续使用当前的 watch 请求获取进一步的事件
+		case2：
+			从指定的资源版本开始，建立一致性数据流
+			ResourceVersion = "某个大于0的值"：表示从指定的资源版本开始同步
+			ResourceVersionMatch = ResourceVersionMatchNotOlderThan：表示允许返回不早于指定资源版本的数据
+			操作流程:
+				建立数据流：与服务器在提供的资源版本基础上建立数据流。
+				初始状态：以 Added 事件的形式，服务器开始发送所有资源的初始状态。
+				同步点：服务器发送一个包含提供的(或者更新的)资源版本的 Bookmark 事件。
+				同步完成：接收到 Bookmark 事件后，控制器(或者反射器 reflector)认为自身已与服务器状态同步。
+				数据存储：用收集到的资源更新其内部存储。
+				后续事件处理：继续使用当前的 watch 请求获取进一步的事件。
+	*/
 
 	if r.UseWatchList {
 		w, err = r.watchList(stopCh)
@@ -342,6 +375,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	}
 
 	if fallbackToList {
+		// list的逻辑
 		err = r.list(stopCh)
 		if err != nil {
 			return err
@@ -353,7 +387,9 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	resyncerrc := make(chan error, 1)
 	cancelCh := make(chan struct{})
 	defer close(cancelCh)
+	// resync的逻辑
 	go r.startResync(stopCh, cancelCh, resyncerrc)
+	// watch的逻辑
 	return r.watch(w, stopCh, resyncerrc)
 }
 
@@ -373,8 +409,10 @@ func (r *Reflector) startResync(stopCh <-chan struct{}, cancelCh <-chan struct{}
 		case <-cancelCh:
 			return
 		}
+		// 判断是否需要调用resync方法
 		if r.ShouldResync == nil || r.ShouldResync() {
 			klog.V(4).Infof("%s: forcing resync", r.name)
+			// 最终调用的也是store的resync方法，也就是deltaFIFO的resync方法
 			if err := r.store.Resync(); err != nil {
 				resyncerrc <- err
 				return
@@ -434,6 +472,7 @@ func (r *Reflector) watch(w watch.Interface, stopCh <-chan struct{}, resyncerrc 
 			}
 		}
 
+		// 拿到数据以后，会调用watchHandler，watchHandler根据事件的不同类型，决定到底是调用store的add、delete、modified等对应方法
 		err = watchHandler(start, w, r.store, r.expectedType, r.expectedGVK, r.name, r.typeDescription, r.setLastSyncResourceVersion, nil, r.clock, resyncerrc, stopCh)
 		// Ensure that watch will not be reused across iterations.
 		w.Stop()
@@ -566,6 +605,7 @@ func (r *Reflector) list(stopCh <-chan struct{}) error {
 		return fmt.Errorf("unable to understand list result %#v (%v)", list, err)
 	}
 	initTrace.Step("Objects extracted")
+	// 获取到数据以后，会调用syncWith，syncWith会调用store的replace方法，也就是deltaFIFO的replace方法
 	if err := r.syncWith(items, resourceVersion); err != nil {
 		return fmt.Errorf("unable to sync list result: %v", err)
 	}

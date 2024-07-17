@@ -78,11 +78,19 @@ type DeltaFIFOOptions struct {
 // the Pop() method.
 //
 // DeltaFIFO solves this use case:
+//
 //   - You want to process every object change (delta) at most once.
+//     你希望处理每个对象的变化最多一次
+//
 //   - When you process an object, you want to see everything
 //     that's happened to it since you last processed it.
+//     当你处理一个对象时，希望知道这个对象与你上次处理时，发生了哪些变化
+//
 //   - You want to process the deletion of some of the objects.
+//     你希望一个对象删除时，你仍然能够处理它
+//
 //   - You might want to periodically reprocess objects.
+//     你可能想要周期性的处理所有对象
 //
 // DeltaFIFO's Pop(), Get(), and GetByKey() methods return
 // interface{} to satisfy the Store/Queue interfaces, but they
@@ -110,6 +118,7 @@ type DeltaFIFO struct {
 	// `queue` maintains FIFO order of keys for consumption in Pop().
 	// There are no duplicates in `queue`.
 	// A key is in `queue` if and only if it is in `items`.
+	// 确保顺序性
 	queue []string
 
 	// populated is true if the first batch of items inserted by Replace() has been populated
@@ -120,10 +129,12 @@ type DeltaFIFO struct {
 
 	// keyFunc is used to make the key used for queued item
 	// insertion and retrieval, and should be deterministic.
+	// 默认使用SplitMetaNamespaceKey，使用<namespace>/<name>的格式，如果不指定namespace时用name
 	keyFunc KeyFunc
 
 	// knownObjects list keys that are "known" --- affecting Delete(),
 	// Replace(), and Resync()
+	// 就是Indexer
 	knownObjects KeyListerGetter
 
 	// Used to indicate a queue is closed so a control loop can exit when a queue is empty.
