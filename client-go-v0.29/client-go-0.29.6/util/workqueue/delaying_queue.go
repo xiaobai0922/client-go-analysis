@@ -28,9 +28,9 @@ import (
 // DelayingInterface is an Interface that can Add an item at a later time. This makes it easier to
 // requeue items after failures without ending up in a hot-loop.
 type DelayingInterface interface {
-	Interface
+	Interface // 通用队列
 	// AddAfter adds an item to the workqueue after the indicated duration has passed
-	AddAfter(item interface{}, duration time.Duration)
+	AddAfter(item interface{}, duration time.Duration) // 添加延迟，在某个时间之后，将item添加到通用队列中
 }
 
 // DelayingQueueConfig specifies optional configurations to customize a DelayingInterface.
@@ -116,10 +116,10 @@ func newDelayingQueue(clock clock.WithTicker, q Interface, name string, provider
 
 // delayingType wraps an Interface and provides delayed re-enquing
 type delayingType struct {
-	Interface
+	Interface // 嵌套普通Queue
 
 	// clock tracks time for delayed firing
-	clock clock.Clock
+	clock clock.Clock // 计时器
 
 	// stopCh lets us signal a shutdown to the waiting loop
 	stopCh chan struct{}
@@ -130,7 +130,7 @@ type delayingType struct {
 	heartbeat clock.Ticker
 
 	// waitingForAddCh is a buffered channel that feeds waitingForAdd
-	waitingForAddCh chan *waitFor
+	waitingForAddCh chan *waitFor // 传递waitFor的channel，默认是1000
 
 	// metrics counts the number of retries
 	metrics retryMetrics

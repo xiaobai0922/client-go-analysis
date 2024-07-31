@@ -20,18 +20,18 @@ import "k8s.io/utils/clock"
 
 // RateLimitingInterface is an interface that rate limits items being added to the queue.
 type RateLimitingInterface interface {
-	DelayingInterface
+	DelayingInterface // 延时队列中包含了普通队列，限速队列中包含了延时队列
 
 	// AddRateLimited adds an item to the workqueue after the rate limiter says it's ok
-	AddRateLimited(item interface{})
+	AddRateLimited(item interface{}) // 向队列中添加一个元素
 
 	// Forget indicates that an item is finished being retried.  Doesn't matter whether it's for perm failing
 	// or for success, we'll stop the rate limiter from tracking it.  This only clears the `rateLimiter`, you
 	// still have to call `Done` on the queue.
-	Forget(item interface{})
+	Forget(item interface{}) // 停止元素重试
 
 	// NumRequeues returns back how many times the item was requeued
-	NumRequeues(item interface{}) int
+	NumRequeues(item interface{}) int // 记录这个元素被处理了多少次
 }
 
 // RateLimitingQueueConfig specifies optional configurations to customize a RateLimitingInterface.

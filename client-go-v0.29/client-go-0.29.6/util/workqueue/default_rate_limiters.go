@@ -26,12 +26,12 @@ import (
 
 type RateLimiter interface {
 	// When gets an item and gets to decide how long that item should wait
-	When(item interface{}) time.Duration
+	When(item interface{}) time.Duration // 返回一个对象需要等待的时间
 	// Forget indicates that an item is finished being retried.  Doesn't matter whether it's for failing
 	// or for success, we'll stop tracking it
-	Forget(item interface{})
+	Forget(item interface{}) // 标识一个元素结束重试
 	// NumRequeues returns back how many failures the item has had
-	NumRequeues(item interface{}) int
+	NumRequeues(item interface{}) int // 标记这个元素被处理了多少次
 }
 
 // DefaultControllerRateLimiter is a no-arg constructor for a default rate limiter for a workqueue.  It has

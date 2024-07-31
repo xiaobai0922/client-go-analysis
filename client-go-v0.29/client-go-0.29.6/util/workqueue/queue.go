@@ -24,12 +24,12 @@ import (
 )
 
 type Interface interface {
-	Add(item interface{})
-	Len() int
-	Get() (item interface{}, shutdown bool)
-	Done(item interface{})
-	ShutDown()
-	ShutDownWithDrain()
+	Add(item interface{})                   // 添加元素
+	Len() int                               // 队列元素个数
+	Get() (item interface{}, shutdown bool) // 获取一个队列元素
+	Done(item interface{})                  // 标记一个元素已经被处理完
+	ShutDown()                              // 关闭队列
+	ShutDownWithDrain()                     // 是否正在关闭
 	ShuttingDown() bool
 }
 
@@ -116,19 +116,23 @@ type Type struct {
 	// queue defines the order in which we will work on items. Every
 	// element of queue should be in the dirty set and not in the
 	// processing set.
+	// 定义队列，具有顺序性，表示待处理的元素列表
 	queue []t
 
 	// dirty defines all of the items that need to be processed.
+	// 标记需要被处理的元素
 	dirty set
 
 	// Things that are currently being processed are in the processing set.
 	// These things may be simultaneously in the dirty set. When we finish
 	// processing something and remove it from this set, we'll check if
 	// it's in the dirty set, and if so, add it to the queue.
+	// 当前正在处理的元素
 	processing set
 
 	cond *sync.Cond
 
+	// 是否正在关闭
 	shuttingDown bool
 	drain        bool
 

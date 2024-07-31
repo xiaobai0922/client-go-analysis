@@ -92,10 +92,13 @@ func MetaNamespaceIndexFunc(obj interface{}) ([]string, error) {
 }
 
 // Index maps the indexed value to a set of keys in the store that match on that value
+// key 是IndexFunc计算出来的结果，例如default，value是所有obj对象的key的集合
 type Index map[string]sets.String
 
 // Indexers maps a name to an IndexFunc
+// key 是索引的分类名，比如namespace，value是一个方法，通过该方法可以获取obj的namespace，例如default
 type Indexers map[string]IndexFunc
 
 // Indices maps a name to an Index
+// key是索引的分类名，比如namespace
 type Indices map[string]Index
